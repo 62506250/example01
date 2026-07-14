@@ -1,12 +1,21 @@
+import os
 import pygame
+from dotenv import load_dotenv
+
+load_dotenv()
 
 SCREEN_WIDTH = 1100
 SCREEN_HEIGHT = 720
 FPS = 60
 CAPTION = "1v1 Shooter Arena"
 
-DATA_DIR = "data"
-DATABASE_FILE = DATA_DIR + "/shooter_arena.db"
+DB_CONFIG = {
+    "host": os.environ.get("HOST", "localhost"),
+    "port": os.environ.get("PORT", "5432"),
+    "dbname": os.environ.get("DATABASE", "shooter_arena"),
+    "user": os.environ.get("USERNAME", "postgres"),
+    "password": os.environ.get("PASSWORD", "postgres"),
+}
 
 BG_TOP = (14, 14, 28)
 BG_BOTTOM = (34, 12, 46)
@@ -35,6 +44,7 @@ STARTING_TIME_SECONDS = 45.0
 TARGET_RADIUS = 24
 MAX_TARGETS_ON_SCREEN = 3
 PLAY_AREA_TOP = 130  
+
 MIN_TARGET_SCORE = 1
 MAX_TARGET_SCORE = 5
 MAX_SCORING_DISTANCE = 700

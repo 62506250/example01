@@ -1,29 +1,32 @@
-import os
-import sqlite3
 import hashlib
 import secrets
+
+import psycopg2
+import psycopg2.extras
 
 
 class DataManager:
 
-    def __init__(self, database_file):
-        self._database_file = database_file
+    def __init__(self, db_config):
+        self._db_config = db_config
         self._ensure_database()
 
     def _open_connection(self):
-        connection = sqlite3.connect(self._database_file)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
+        connection = psycopg2.connect(
+            host=self._db_config["host"],
+            port=self._db_config["port"],
+            dbname=self._db_config["dbname"],
+            user=self._db_config["user"],
+            password=self._db_config["password"],
+            cursor_factory=psycopg2.extras.RealDictCursor,
+        )
         return connection
 
     def _ensure_database(self):
-        directory = os.path.dirname(self._database_file)
-        if directory:
-            os.makedirs(directory, exist_ok=True)
-
         connection = self._open_connection()
         try:
-            connection.execute(
+            cursor = connection.cursor()
+            cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS users (
                     username TEXT PRIMARY KEY,
@@ -32,17 +35,18 @@ class DataManager:
                 )
                 """
             )
-            connection.execute(
+            cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS leaderboard (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     username TEXT NOT NULL,
                     score INTEGER NOT NULL,
-                    recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP::text
                 )
                 """
             )
             connection.commit()
+            cursor.close()
         finally:
             connection.close()
 
@@ -61,12 +65,15 @@ class DataManager:
 
         connection = self._open_connection()
         try:
-            connection.execute(
-                "INSERT INTO users (username, salt, password_hash) VALUES (?, ?, ?)",
+            cursor = connection.cursor()
+            cursor.execute(
+                "INSERT INTO users (username, salt, password_hash) VALUES (%s, %s, %s)",
                 (username, salt, password_hash),
             )
             connection.commit()
-        except sqlite3.IntegrityError:
+            cursor.close()
+        except psycopg2.IntegrityError:
+            connection.rollback()
             return False, "That username is already taken."
         finally:
             connection.close()
@@ -78,10 +85,13 @@ class DataManager:
 
         connection = self._open_connection()
         try:
-            row = connection.execute(
-                "SELECT salt, password_hash FROM users WHERE username = ?",
+            cursor = connection.cursor()
+            cursor.execute(
+                "SELECT salt, password_hash FROM users WHERE username = %s",
                 (username,),
-            ).fetchone()
+            )
+            row = cursor.fetchone()
+            cursor.close()
         finally:
             connection.close()
 
@@ -97,10 +107,13 @@ class DataManager:
     def load_leaderboard(self):
         connection = self._open_connection()
         try:
-            rows = connection.execute(
+            cursor = connection.cursor()
+            cursor.execute(
                 "SELECT username, score FROM leaderboard "
                 "ORDER BY score DESC, id ASC LIMIT 100"
-            ).fetchall()
+            )
+            rows = cursor.fetchall()
+            cursor.close()
         finally:
             connection.close()
 
@@ -112,10 +125,12 @@ class DataManager:
     def add_score(self, username, score):
         connection = self._open_connection()
         try:
-            connection.execute(
-                "INSERT INTO leaderboard (username, score) VALUES (?, ?)",
+            cursor = connection.cursor()
+            cursor.execute(
+                "INSERT INTO leaderboard (username, score) VALUES (%s, %s)",
                 (username, score),
             )
             connection.commit()
+            cursor.close()
         finally:
             connection.close()

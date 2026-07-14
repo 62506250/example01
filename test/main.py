@@ -14,7 +14,7 @@ class App:
         self._clock = pygame.time.Clock()
         self._running = True
 
-        self._data = DataManager(config.DATABASE_FILE)
+        self._data = DataManager(config.DB_CONFIG)
         self._screen = MenuScreen(self._data)
 
     def run(self):
