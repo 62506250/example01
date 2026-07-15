@@ -13,7 +13,7 @@ DB_CONFIG = {
     "host": os.environ.get("HOST", "localhost"),
     "port": os.environ.get("PORT", "5432"),
     "dbname": os.environ.get("DATABASE", "shooter_arena"),
-    "user": os.environ.get("USERNAME", "postgres"),
+    "user": os.environ.get("DB_USERNAME", "postgres"),
     "password": os.environ.get("PASSWORD", "postgres"),
 }
 

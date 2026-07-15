@@ -1,17 +1,16 @@
-import hashlib
-import secrets
-
 import psycopg2
 import psycopg2.extras
 
 
 class DataManager:
+    """Handles the PostgreSQL database for accounts and the leaderboard."""
 
     def __init__(self, db_config):
         self._db_config = db_config
         self._ensure_database()
 
     def _open_connection(self):
+        """Opens a new connection to the database."""
         connection = psycopg2.connect(
             host=self._db_config["host"],
             port=self._db_config["port"],
@@ -23,6 +22,7 @@ class DataManager:
         return connection
 
     def _ensure_database(self):
+        """Creates the database tables if they do not already exist."""
         connection = self._open_connection()
         try:
             cursor = connection.cursor()
@@ -30,8 +30,7 @@ class DataManager:
                 """
                 CREATE TABLE IF NOT EXISTS users (
                     username TEXT PRIMARY KEY,
-                    salt TEXT NOT NULL,
-                    password_hash TEXT NOT NULL
+                    password TEXT NOT NULL
                 )
                 """
             )
@@ -50,25 +49,17 @@ class DataManager:
         finally:
             connection.close()
 
-    @staticmethod
-    def _hash_password(password, salt):
-        combined = salt + password
-        return hashlib.sha256(combined.encode("utf-8")).hexdigest()
-
     def sign_up(self, username, password):
         username = username.strip()
         if not username or not password:
             return False, "Username and password cannot be empty."
 
-        salt = secrets.token_hex(8)
-        password_hash = self._hash_password(password, salt)
-
         connection = self._open_connection()
         try:
             cursor = connection.cursor()
             cursor.execute(
-                "INSERT INTO users (username, salt, password_hash) VALUES (%s, %s, %s)",
-                (username, salt, password_hash),
+                "INSERT INTO users (username, password) VALUES (%s, %s)",
+                (username, password),
             )
             connection.commit()
             cursor.close()
@@ -87,7 +78,7 @@ class DataManager:
         try:
             cursor = connection.cursor()
             cursor.execute(
-                "SELECT salt, password_hash FROM users WHERE username = %s",
+                "SELECT password FROM users WHERE username = %s",
                 (username,),
             )
             row = cursor.fetchone()
@@ -98,8 +89,7 @@ class DataManager:
         if row is None:
             return False, "No account with that username."
 
-        expected_hash = self._hash_password(password, row["salt"])
-        if expected_hash != row["password_hash"]:
+        if password != row["password"]:
             return False, "Incorrect password."
 
         return True, "Logged in."
